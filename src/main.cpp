@@ -124,6 +124,7 @@ using IniData = oMap<std::string, oMap<std::string, std::string>>;
 
 std::string spaces = " \t\n\r";
 std::string comments = ";#";
+std::string sectId = "[]";
 
 IniData read(const std::string& file){
     IniData output;
@@ -152,7 +153,9 @@ IniData read(const std::string& file){
             std::vector<std::string> kV;
             kV = split(escE.o, "=", escE.i);
             if(kV.size()==2){
-                output[section][kV[0]] = kV[1];
+                std::string key = escape(trim(kV[0], spaces), '\\', false, sectId).o;
+                std::string val = escape(trim(kV[1], spaces), '\\', false, sectId).o;
+                output[section][key] = val;
             }
         }
     }
