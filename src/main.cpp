@@ -79,22 +79,27 @@ std::vector<std::string> split(const std::string& str, const std::string& del, c
     return output;
 }
 
-std::pair<std::string, unsigned int> escape(const std::string& str, const char& esc, const std::string_view& filter = ""){
-    std::pair<std::string, unsigned int> output;
-    output.second = 0;
+struct Esc{
+    std::string o = "";
+    unsigned int i = 0;
+};
+
+Esc escape(const std::string& str, const char& esc, const std::string_view& filter = ""){
+    Esc output;
     bool escaped = false;
     for(const char& c : str){
         if(escaped){
             escaped = false;
             if(filter.find(c)==std::string::npos){
-                output.first+=esc;
-                output.second++;
+                output.o+=esc;
+            }else{
+                output.i++;
             }
-            output.first+=c;
+            output.o+=c;
         }else if(c == esc){
             escaped = true;
         }else{
-            output.first+=c;
+            output.o+=c;
         }
     }
     return output;
@@ -109,10 +114,26 @@ std::string trim(const std::string& str, const std::string& del){
 
 using IniData = oMap<std::string, oMap<std::string, std::string>>;
 
+std::string spaces = " \t\n\r";
+std::string comments = ";#";
+
 IniData read(std::string file){
+    std::ifstream f(file);
+    if(!f.is_open()){
+        std::cerr << "INIRW: Failed to open file " << file << "\n";
+        return IniData{};
+    }
+    std::string line;
+    while(std::getline(f, line)){
+        if(line=="") continue;
+        Esc escL = escape(line, '\\', comments);
+        line = split(escL.o, comments, escL.i)[0];
+        std::cout << line << "\n";
+    }
     return IniData{};
 }
 
 int main(){
+    read("test.ini");
     std::cout << "Hello World!\n";
 }
