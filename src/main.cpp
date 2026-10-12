@@ -7,13 +7,14 @@
 #include <string_view>
 
 template<typename Key, typename Value> class oMap{
-    using DList = typename std::list<std::pair<Key, Value>>;
-    DList data;
-    using DListIt = typename DList::iterator;
-    using LList = std::unordered_map<Key, DListIt>;
-    LList locs;
-    using LListIt = typename LList::iterator;
     public:
+        using DList = typename std::list<std::pair<Key, Value>>;
+        DList data;
+        using DListIt = typename DList::iterator;
+        using LList = std::unordered_map<Key, DListIt>;
+        LList locs;
+        using LListIt = typename LList::iterator;
+
         oMap() = default;
         oMap(oMap&&) = default;
         oMap& operator=(oMap&&) = default;
@@ -52,9 +53,17 @@ template<typename Key, typename Value> class oMap{
                 locs.erase(found);
             }
         }
+        DListIt find(const Key& k) {
+            LListIt found = locs.find(k);
+            if(found!=locs.end()){
+                return found->second;
+            }else{
+                return data.end();
+            }
+        }
 };
 
-std::vector<std::string> split(const std::string& str, const std::string& del, const int& bI = -1){
+std::vector<std::string> split(const std::string& str, const std::string& del, const bool& vP = false, const int& bI = -1){
     std::vector<std::string> output;
     bool pB = (bI==-1);
     if(pB) output.reserve(2);
@@ -67,7 +76,7 @@ std::vector<std::string> split(const std::string& str, const std::string& del, c
         }else{
             if(it == bI) {
                 output.push_back(str.substr(0, end));
-                output.push_back(str.substr(end+1));
+                output.push_back(str.substr(vP ? end : end+1));
                 return output;
             }
         }
@@ -121,12 +130,16 @@ std::string trim(const std::string& str, const std::string& del){
 }
 
 using IniData = oMap<std::string, oMap<std::string, std::string>>;
+using Section = oMap<std::string, std::string>;
 
 std::string spaces = " \t\n\r";
 std::string comments = ";#";
 std::string sectId = "[]";
+std::vector<std::string> wL;
 
-IniData read(const std::string& file){
+IniData read(const std::string& file, bool write = false, IniData wD = IniData{}){
+    size_t lKI = 0;
+    if(write) wL.clear();
     IniData output;
     std::ifstream f(file);
     if(!f.is_open()){
@@ -135,6 +148,7 @@ IniData read(const std::string& file){
     }
     std::string line = "";
     std::string section = "";
+    std::string lastSect = "";
     bool fR = true;
     while(std::getline(f, line)){
         if(fR){
@@ -142,33 +156,85 @@ IniData read(const std::string& file){
             if(line.compare(0, 3, "\xEF\xBB\xBF") == 0) line.erase(0, 3);
         }
         Esc escL = escape(line, '\\', true, comments);
-        line = split(escL.o, comments, escL.i)[0];
+        std::vector<std::string> sL = split(escL.o, comments, true, escL.i);
+        std::string rawLine = line;
+        line = sL[0];
+        if(sL.size()<2) sL.push_back("");
         line = trim(line, spaces);
-        if(line=="") continue;
+        if(line=="") {
+            if(write) wL.push_back(rawLine);
+            continue;
+        }
         if(!line.empty() && line.front() == '[' && line.back() == ']'){
             section = trim(line, "[]");
-            output[section];
+            if(write){
+                Section& sectData = wD[lastSect];
+                size_t offset = 0;
+                for(std::pair<std::string, std::string> kV : sectData){
+                    wL.insert(wL.begin()+lKI+offset, kV.first + " = " + kV.second);
+                    offset++;
+                    // wL.push_back(kV.first + " = " + kV.second);
+                }
+                wD.erase(lastSect);
+                lastSect = section;
+                if(wD.find(section)!=wD.end()){
+                    wL.push_back("[" + section + "]" + sL[1]);
+                    lKI = wL.size();
+                }
+            }else{
+                output[section];
+            }
         }else{
             Esc escE = escape(line, '\\', true, "=");
             std::vector<std::string> kV;
-            kV = split(escE.o, "=", escE.i);
+            kV = split(escE.o, "=", false, escE.i);
             if(kV.size()==2){
                 std::string key = escape(trim(kV[0], spaces), '\\', false, sectId).o;
                 std::string val = escape(trim(kV[1], spaces), '\\', false, sectId).o;
-                output[section][key] = val;
+                if(write){
+                    Section& sectData = wD[section];
+                    Section::DListIt found = sectData.find(key);
+                    if(found!=sectData.end()){
+                        if(val!=found->second){
+                            wL.push_back(found->first + " = " + found->second + sL[1]);
+                            sectData.erase(key);
+                        }else{
+                            wL.push_back(rawLine);
+                            sectData.erase(key);
+                        }
+                    }
+                    lKI = wL.size();
+                }else{
+                    output[section][key] = val;
+                }
             }
         }
     }
     return output;
 }
 
+IniData write(const std::string& file, const IniData& data){
+    read(file, true, data);
+    for(std::string test : wL){
+        std::cout << test << "\n";
+    }
+    return IniData{};
+}
+
 int main(){
     IniData data = read("test.ini");
-    for(std::pair<std::string, oMap<std::string, std::string>> section : data){
-        std::cout << "[" << section.first << "]\n";
-        for(std::pair<std::string, std::string> entry : section.second){
-            std::cout << "KEY: " << entry.first << "," << "VALUE: " << entry.second << "\n";
-        }
-    }
+    // for(std::pair<std::string, oMap<std::string, std::string>> section : data){
+    //     std::cout << "[" << section.first << "]\n";
+    //     for(std::pair<std::string, std::string> entry : section.second){
+    //         std::cout << "KEY: " << entry.first << "," << "VALUE: " << entry.second << "\n";
+    //     }
+    // }
+    data["SECT1"]["k1"] = "v5";
+    data["SECT1"]["k3"] = "v6";
+    data["SECT1"]["k4"] = "v7";
+    data["SECT1"].erase("k2");
+
+    write("test.ini", data);
+
     std::cout << "Hello World!\n";
 }
