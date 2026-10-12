@@ -13,13 +13,14 @@ namespace INIRW{
     template<typename Key, typename Value> class oMap{
         public:
             using DList = typename std::list<std::pair<Key, Value>>;
-            DList data;
             using DListIt = typename DList::iterator;
             using CDListIt = typename DList::const_iterator;
             using LList = std::unordered_map<Key, DListIt>;
-            LList locs;
             using LListIt = typename LList::iterator;
-
+        private:
+            DList data;
+            LList locs;
+        public:
             oMap() = default;
             oMap(oMap&&) = default;
             oMap& operator=(oMap&&) = default;
@@ -46,12 +47,12 @@ namespace INIRW{
                     return entry->second;
                 }
             }
-            size_t size() { return data.size(); }
+            size_t size() const { return data.size(); }
             DListIt begin() { return data.begin(); }
             DListIt end() { return data.end(); }
             CDListIt begin() const { return data.begin(); }
             CDListIt end()  const { return data.end(); }
-            bool empty() { return data.empty(); }
+            bool empty() const { return data.empty(); }
             void clear() { locs.clear(); data.clear(); }
             void erase(const Key& k) { 
                 LListIt found = locs.find(k);
@@ -61,6 +62,14 @@ namespace INIRW{
                 }
             }
             DListIt find(const Key& k) {
+                LListIt found = locs.find(k);
+                if(found!=locs.end()){
+                    return found->second;
+                }else{
+                    return data.end();
+                }
+            }
+            CDListIt find(const Key& k) const {
                 LListIt found = locs.find(k);
                 if(found!=locs.end()){
                     return found->second;
@@ -117,7 +126,7 @@ namespace INIRW{
                 }else{
                     if(!broken) output.i++;
                 }
-                output.o+=c;
+                if(c!=esc) output.o+=c;
             }else if(c == esc){
                 escaped = true;
             }else{
@@ -142,6 +151,18 @@ namespace INIRW{
     inline std::string spaces = " \t\n\r";
     inline std::string comments = ";#";
     inline std::string sectId = "[]";
+    inline std::string tEsc = spaces + comments + sectId + '\\';
+
+    inline std::string rescape(const std::string& str, const std::string& del){
+        std::string output;
+        for(char c : str){
+            if(del.find(c)!=std::string::npos){
+                output+="\\";
+            }
+            output+=c;
+        }
+        return output;
+    }
 
     inline IniData read(const std::string& file, bool write = false, IniData wD = IniData{}, std::vector<std::string>* wL = nullptr){
         size_t lKI = 0;
@@ -182,7 +203,7 @@ namespace INIRW{
                     Section& sectData = wD[lastSect];
                     size_t offset = 0;
                     for(const std::pair<std::string, std::string>& kV : sectData){
-                        wL->insert(wL->begin()+lKI+offset, kV.first + " = " + kV.second);
+                        wL->insert(wL->begin()+lKI+offset, rescape(kV.first, tEsc) + " = " + rescape(kV.second, tEsc));
                         offset++;
                         // wL.push_back(kV.first + " = " + kV.second);
                     }
@@ -209,7 +230,7 @@ namespace INIRW{
                             Esc escS = escape(found->second, '\\', true, comments);
                             std::vector<std::string> sV = split(escS.o, comments, true, escS.i);
                             if(val!=trim(sV[0], spaces) || comment!=found->second.substr(sV[0].size() + escS.i)){
-                                wL->push_back(found->first + " = " + found->second);
+                                wL->push_back(rescape(found->first, tEsc) + " = " + rescape(found->second, tEsc) + comment);
                                 sectData.erase(key);
                             }else{
                                 wL->push_back(rawLine);
@@ -227,7 +248,7 @@ namespace INIRW{
             for(std::pair<std::string, Section>& sect : wD){
                 if(!sect.second.empty() && lastSect!=sect.first) wL->push_back("[" + sect.first + "]"); 
                 for(const std::pair<std::string, std::string>& kV : sect.second){
-                    wL->push_back(kV.first + " = " + kV.second);
+                    wL->push_back(rescape(kV.first, tEsc) + " = " + rescape(kV.second, tEsc));
                 }
             }
         }
