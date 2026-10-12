@@ -142,7 +142,7 @@ IniData read(const std::string& file, bool write = false, IniData wD = IniData{}
     if(write) wL.clear();
     IniData output;
     std::ifstream f(file);
-    if(!f.is_open()){
+    if(!f.is_open() && !write){
         std::cerr << "INIRW: Failed to open file " << file << "\n";
         return IniData{};
     }
@@ -159,7 +159,8 @@ IniData read(const std::string& file, bool write = false, IniData wD = IniData{}
         std::vector<std::string> sL = split(escL.o, comments, true, escL.i);
         std::string rawLine = line;
         line = sL[0];
-        if(sL.size()<2) sL.push_back("");
+        std::string comment = "";
+        if(sL.size() == 2) comment = rawLine.substr(sL[0].size() + escL.i);
         line = trim(line, spaces);
         if(line=="") {
             if(write) wL.push_back(rawLine);
@@ -178,7 +179,7 @@ IniData read(const std::string& file, bool write = false, IniData wD = IniData{}
                 wD.erase(lastSect);
                 lastSect = section;
                 if(wD.find(section)!=wD.end()){
-                    wL.push_back("[" + section + "]" + sL[1]);
+                    wL.push_back("[" + section + "]" + comment);
                     lKI = wL.size();
                 }
             }else{
@@ -195,8 +196,10 @@ IniData read(const std::string& file, bool write = false, IniData wD = IniData{}
                     Section& sectData = wD[section];
                     Section::DListIt found = sectData.find(key);
                     if(found!=sectData.end()){
-                        if(val!=found->second){
-                            wL.push_back(found->first + " = " + found->second + sL[1]);
+                        Esc escS = escape(found->second, '\\', true, comments);
+                        std::vector<std::string> sV = split(escS.o, comments, true, escS.i);
+                        if(val!=trim(sV[0], spaces) || comment!=found->second.substr(sV[0].size() + escS.i)){
+                            wL.push_back(found->first + " = " + found->second);
                             sectData.erase(key);
                         }else{
                             wL.push_back(rawLine);
@@ -210,19 +213,35 @@ IniData read(const std::string& file, bool write = false, IniData wD = IniData{}
             }
         }
     }
+    if(write){
+        for(std::pair<std::string, Section>& sect : wD){
+            if(!sect.second.empty()) wL.push_back("[" + sect.first + "]"); 
+            for(const std::pair<std::string, std::string>& kV : sect.second){
+                wL.push_back(kV.first + " = " + kV.second);
+            }
+        }
+    }
     return output;
 }
 
-IniData write(const std::string& file, const IniData& data){
+bool write(const std::string& file, const IniData& data){
     read(file, true, data);
-    for(std::string test : wL){
-        std::cout << test << "\n";
+    std::ofstream f(file);
+    if(!f.is_open()){
+        std::cerr << "INIRW: Failed to open " << file << " for writing";
+        return false;
     }
-    return IniData{};
+    for(std::string line : wL){
+        f << line << "\n";
+        std::cout <<line <<"\n";
+    }
+    f.close();
+
+    return true;
 }
 
 int main(){
-    IniData data = read("test.ini");
+    IniData data = read("test2.ini");
     // for(std::pair<std::string, oMap<std::string, std::string>> section : data){
     //     std::cout << "[" << section.first << "]\n";
     //     for(std::pair<std::string, std::string> entry : section.second){
@@ -233,8 +252,9 @@ int main(){
     data["SECT1"]["k3"] = "v6";
     data["SECT1"]["k4"] = "v7";
     data["SECT1"].erase("k2");
+    data["SECT2"]["k4"] = "v8 ; Comments can be added like this";
 
-    write("test.ini", data);
+    write("test2.ini", data);
 
     std::cout << "Hello World!\n";
 }
