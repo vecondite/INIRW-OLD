@@ -2,6 +2,8 @@
 #include <vector>
 #include <list>
 #include <unordered_map>
+#include <string>
+#include <fstream>
 
 template<typename Key, typename Value> class oMap{
     using DList = typename std::list<std::pair<Key, Value>>;
@@ -51,15 +53,66 @@ template<typename Key, typename Value> class oMap{
         }
 };
 
-using IniData = oMap<std::string, oMap<std::string, std::string>>;
+std::vector<std::string> split(const std::string& str, const std::string& del, const int& bI = -1){
+    std::vector<std::string> output;
+    unsigned int it = 0;
+    size_t start = 0;
+    size_t end = 0;
+    while((end=str.find_first_of(del, start))!=std::string::npos){
+        if(bI==-1){
+            output.push_back(str.substr(start, end-start));
+        }else{
+            if(it == bI) {
+                output.push_back(str.substr(0, end));
+                output.push_back(str.substr(end+1));
+                return output;
+            }
+        }
+        start = end+1;
+        it++;
+    }
+    if(bI==-1 && start <= str.length()){
+        output.push_back(str.substr(start));
+    }else{
+        output.push_back(str);
+    }
+    return output;
+}
 
-int main(){
-    IniData test;
-    test["hello"]["world"] = "Hello World!";
-    for(std::pair<std::string,oMap<std::string, std::string>> cat : test){
-        std::cout << "[" << cat.first << "]\n";
-        for(std::pair<std::string, std::string> kV : cat.second){
-            std::cout << kV.first << " = " << kV.second << "\n";
+std::pair<std::string, unsigned int> escape(const std::string& str, const char& esc, const std::string_view& filter = ""){
+    std::pair<std::string, unsigned int> output;
+    output.second = 0;
+    bool escaped = false;
+    for(const char& c : str){
+        if(escaped){
+            escaped = false;
+            if(filter.find(c)==std::string::npos){
+                output.first+=esc;
+                output.second++;
+            }
+            output.first+=c;
+        }else if(c == esc){
+            escaped = true;
+        }else{
+            output.first+=c;
         }
     }
+    return output;
+}
+
+std::string trim(const std::string& str, const std::string& del){
+    size_t start = str.find_first_not_of(del);
+    if(start==std::string::npos) return "";
+    size_t end = str.find_last_not_of(del);
+    return str.substr(start, end-start+1);
+}
+
+using IniData = oMap<std::string, oMap<std::string, std::string>>;
+
+IniData read(std::string file){
+    return IniData{};
+}
+
+int main(){
+    std::cout << "Hello World!\n";
 }
