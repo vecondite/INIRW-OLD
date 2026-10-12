@@ -25,7 +25,7 @@ int main(){
     data["SECT3"]["k1"] = "v10";
 
     // ERASING VALUES
-    data["SECT1"].erase(k2);
+    data["SECT1"].erase("k2");
 
     // UPDATING / GENERATING
     bool updated = INIRW::write("test.ini", data);

@@ -19,6 +19,9 @@ int main(){
     data["SECT2"]["k4"] = "v8 ; Comments can be added like this";
     data["SECT3"]["k1"] = "v10";
 
+    // ERASING VALUES
+    data["SECT1"].erase("k2");
+
     // UPDATING / GENERATING
     bool updated = INIRW::write("test.ini", data);
     std::cout << (updated ? "File updated!" : "File not updated!") << "\n";
