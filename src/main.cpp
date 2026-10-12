@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <string>
 #include <fstream>
+#include <string_view>
 
 template<typename Key, typename Value> class oMap{
     using DList = typename std::list<std::pair<Key, Value>>;
@@ -22,7 +23,7 @@ template<typename Key, typename Value> class oMap{
             }
         }
         oMap& operator=(const oMap& other){
-            if(this!=other){
+            if(this!=&other){
                 oMap temp(other);
                 data.swap(temp.data);
                 locs.swap(temp.locs);
@@ -55,11 +56,13 @@ template<typename Key, typename Value> class oMap{
 
 std::vector<std::string> split(const std::string& str, const std::string& del, const int& bI = -1){
     std::vector<std::string> output;
-    unsigned int it = 0;
+    bool pB = (bI==-1);
+    if(pB) output.reserve(2);
+    int it = 0;
     size_t start = 0;
     size_t end = 0;
     while((end=str.find_first_of(del, start))!=std::string::npos){
-        if(bI==-1){
+        if(pB){
             output.push_back(str.substr(start, end-start));
         }else{
             if(it == bI) {
@@ -71,7 +74,7 @@ std::vector<std::string> split(const std::string& str, const std::string& del, c
         start = end+1;
         it++;
     }
-    if(bI==-1 && start <= str.length()){
+    if(pB && start <= str.length()){
         output.push_back(str.substr(start));
     }else{
         output.push_back(str);
@@ -84,24 +87,29 @@ struct Esc{
     unsigned int i = 0;
 };
 
-Esc escape(const std::string& str, const char& esc, const std::string_view& filter = ""){
+Esc escape(const std::string& str, const char& esc, bool bF, const std::string_view& filter = ""){
     Esc output;
     bool escaped = false;
+    size_t filtLoc = 0;
+    bool broken = false;
     for(const char& c : str){
+        filtLoc = filter.find(c);
         if(escaped){
             escaped = false;
-            if(filter.find(c)==std::string::npos){
+            if(filtLoc==std::string::npos){
                 output.o+=esc;
             }else{
-                output.i++;
+                if(!broken) output.i++;
             }
             output.o+=c;
         }else if(c == esc){
             escaped = true;
         }else{
+            if(!broken && filtLoc!=std::string::npos && bF) broken = true;
             output.o+=c;
         }
     }
+    if(escaped) output.o += esc;
     return output;
 }
 
@@ -117,23 +125,47 @@ using IniData = oMap<std::string, oMap<std::string, std::string>>;
 std::string spaces = " \t\n\r";
 std::string comments = ";#";
 
-IniData read(std::string file){
+IniData read(const std::string& file){
+    IniData output;
     std::ifstream f(file);
     if(!f.is_open()){
         std::cerr << "INIRW: Failed to open file " << file << "\n";
         return IniData{};
     }
-    std::string line;
+    std::string line = "";
+    std::string section = "";
+    bool fR = true;
     while(std::getline(f, line)){
-        if(line=="") continue;
-        Esc escL = escape(line, '\\', comments);
+        if(fR){
+            fR = false;
+            if(line.compare(0, 3, "\xEF\xBB\xBF") == 0) line.erase(0, 3);
+        }
+        Esc escL = escape(line, '\\', true, comments);
         line = split(escL.o, comments, escL.i)[0];
-        std::cout << line << "\n";
+        line = trim(line, spaces);
+        if(line=="") continue;
+        if(!line.empty() && line.front() == '[' && line.back() == ']'){
+            section = trim(line, "[]");
+            output[section];
+        }else{
+            Esc escE = escape(line, '\\', true, "=");
+            std::vector<std::string> kV;
+            kV = split(escE.o, "=", escE.i);
+            if(kV.size()==2){
+                output[section][kV[0]] = kV[1];
+            }
+        }
     }
-    return IniData{};
+    return output;
 }
 
 int main(){
-    read("test.ini");
+    IniData data = read("test.ini");
+    for(std::pair<std::string, oMap<std::string, std::string>> section : data){
+        std::cout << "[" << section.first << "]\n";
+        for(std::pair<std::string, std::string> entry : section.second){
+            std::cout << "KEY: " << entry.first << "," << "VALUE: " << entry.second << "\n";
+        }
+    }
     std::cout << "Hello World!\n";
 }
