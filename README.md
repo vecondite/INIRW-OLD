@@ -1,5 +1,8 @@
+> [!DANGER]
+> OBSOLETE! Use [the new version](https://github.com/vecondite/inirw)!
+>  
 # INIRW
-A small and simple INI header library for C++.
+A (old and buggy) small and simple INI header library for C++.
 
 Usage:
 ```cpp
