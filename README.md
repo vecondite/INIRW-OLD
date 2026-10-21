@@ -1,4 +1,4 @@
-> [!DANGER]
+> [!WARNING]
 > OBSOLETE! Use [the new version](https://github.com/vecondite/inirw)!
 >  
 # INIRW
